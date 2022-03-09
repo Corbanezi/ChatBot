@@ -1,5 +1,10 @@
 import { Component, OnInit } from '@angular/core';
 import { FormControl } from '@angular/forms';
+import { MatDialog } from '@angular/material/dialog';
+import * as signalR from '@microsoft/signalr';
+import { NameDialogComponent } from 'src/app/shared/name-dialog/name-dialog.component';
+import { MatSnackBar } from '@angular/material/snack-bar';
+
 
 interface Message {
   userName: string,
@@ -13,27 +18,69 @@ interface Message {
 })
 export class HomeComponent implements OnInit {
 
-  messages: Message[] = [{
-    text: 'Olá',
-    userName: 'Felipe'
-  },
-  {
-    text: 'Salve',
-    userName: 'Celso'
-  },
-  {
-    text: 'Aoba',
-    userName: 'Róger'
-  }
-];
+  messages: Message[] = [];
   messageControl = new FormControl('');
-  userName: string = 'Celso';
+  userName!: string;
+
+  connection = new signalR.HubConnectionBuilder()
+  .withUrl("https://localhost:44369/chat")
+  .build();
   
-  constructor() {
+  constructor(
+    public dialog: MatDialog,
+    public snackBar: MatSnackBar) {
+    this.openDialog	()
    }
 
   ngOnInit(): void {
-  
   }
-  sendMessage() {}
+
+
+  openDialog() {  
+    const dialogRef = this.dialog.open(NameDialogComponent, {
+      width: '250px',
+      data: this.userName,
+      disableClose: true
+    });
+
+    dialogRef.afterClosed().subscribe(result =>{
+      this.userName = result;
+      this.startConnection();
+      this.openSnackBar(result);
+    });
+  }
+
+
+  openSnackBar(userName: string) {
+    const message = userName == this.userName? 'você entrou na sala' : `${userName} acabou de entrar`;
+    
+    this.snackBar.open(message, 'fechar', {
+      duration: 5000,
+      horizontalPosition: 'right',
+      verticalPosition: 'top'
+    });
+  }
+
+  startConnection() {
+    this.connection.on("newMessage", (userName: string, text: string) => {
+      this.messages.push({
+        text: text,
+        userName: userName
+      });
+    });
+
+    this.connection.on("newUser", (userName: string) => {
+      this.openSnackBar(userName);
+    });
+
+
+    this.connection.start();
+  }
+
+  sendMessage() {
+    this.connection.send("newMessage", this.userName, this.messageControl.value)
+    .then(() =>{
+      this.messageControl.setValue('');
+    })
+  }
 }
