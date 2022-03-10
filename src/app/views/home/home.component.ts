@@ -73,8 +73,15 @@ export class HomeComponent implements OnInit {
       this.openSnackBar(userName);
     });
 
+    this.connection.on("previousMessages", (messages: Message[]) => {
+      this.messages = messages;
+    });
 
-    this.connection.start();
+
+    this.connection.start()
+      .then(() => {
+        this.connection.send("newUser", this.userName, this.connection.connectionId);
+      });
   }
 
   sendMessage() {
